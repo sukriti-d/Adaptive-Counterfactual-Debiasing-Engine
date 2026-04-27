@@ -66,7 +66,7 @@ export default function Dashboard({ data, sessionId, onReset, source }) {
         {tab === "instability" && <InstabilityPanel data={data} />}
         {tab === "radar"       && <RadarChart data={data} />}
         {tab === "tradeoff"    && <TradeoffSummary data={data} />}
-        {tab === "explainer"   && <BiasExplainer data={data} />}
+        {tab === "explainer"   && <BiasExplainer data={data} sessionId={sessionId}  />}
         {tab === "data"        && <DataPreview data={data} sessionId={sessionId} />}
       </main>
     </div>
