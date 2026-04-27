@@ -31,12 +31,12 @@ warnings.filterwarnings("ignore")
 
 # ACDE modules
 from backend.data_loader    import load_dataset, create_biased_dataset
-from predictor      import prepare_data, train_model, predict, predict_proba
-from perturbator    import generate_counterfactual, generate_all_counterfactuals
-from instability    import calculate_instability, group_instability, flip_breakdown, idi_score
-from intersectional import intersectional_bias, all_metrics
-from mitigator      import apply_reweighting, debias_dataset
-from report         import fairness_score
+from backend.predictor      import prepare_data, train_model, predict, predict_proba
+from backend.perturbator    import generate_counterfactual, generate_all_counterfactuals
+from backend.instability    import calculate_instability, group_instability, flip_breakdown, idi_score
+from backend.intersectional import intersectional_bias, all_metrics
+from backend.mitigator      import apply_reweighting, debias_dataset
+from backend.report         import fairness_score
 
 # ── In-memory session store ─────────────────────────────────────────────────
 SESSIONS = {}
