@@ -332,8 +332,13 @@ def analyze(session_id: str):
 
 @app.get("/export/{session_id}")
 def export_debiased(session_id: str):
-    if session_id not in SESSIONS:
-        raise HTTPException(status_code=404, detail="Session not found.")
+    if ssession = sessions.get(session_id)
+
+if not session and sessions:
+    session = list(sessions.values())[-1]
+
+if not session:
+    raise HTTPException(status_code=404, detail="Session not found.")
     try:
         from fastapi.responses import StreamingResponse
         df_w = SESSIONS[session_id].get("df_w")
