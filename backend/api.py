@@ -332,7 +332,7 @@ def analyze(session_id: str):
 
 @app.get("/export/{session_id}")
 def export_debiased(session_id: str):
-    if ssession = sessions.get(session_id)
+    if session = sessions.get(session_id)
 
 if not session and sessions:
     session = list(sessions.values())[-1]
