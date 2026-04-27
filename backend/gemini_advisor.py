@@ -4,9 +4,9 @@ gemini_advisor.py — AI-powered bias analysis using Google Gemini (new SDK)
 import os
 import json
 import re
-from google import genai
+from google.generativeai import genai
 
-client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 def generate_bias_advisory(result: dict) -> dict:
     before = result.get("before", {})
