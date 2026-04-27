@@ -332,23 +332,27 @@ def analyze(session_id: str):
 
 @app.get("/export/{session_id}")
 def export_debiased(session_id: str):
-session = sessions.get(session_id)
-
-if not session and sessions:
-    session = list(sessions.values())[-1]
-
-if not session:
-    raise HTTPException(status_code=404, detail="Session not found.")
     try:
         from fastapi.responses import StreamingResponse
-        df_w = SESSIONS[session_id].get("df_w")
-        df_export = df_w if (df_w is not None) else SESSIONS[session_id]["df"]
+
+        session = SESSIONS.get(session_id)
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found.")
+
+        df_w = session.get("df_w")
+        df_export = df_w if df_w is not None else session["df"]
+
         csv_bytes = df_export.to_csv(index=False).encode()
+
         return StreamingResponse(
             iter([csv_bytes]),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=acde_debiased_dataset.csv"}
+            headers={
+                "Content-Disposition": "attachment; filename=acde_debiased_dataset.csv"
+            },
         )
+
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
