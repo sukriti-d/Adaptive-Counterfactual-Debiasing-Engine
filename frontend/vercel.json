@@ -1,4 +1,6 @@
 {
+  "buildCommand": "CI=false npx react-scripts build",
+  "outputDirectory": "build",
   "rewrites": [
     { "source": "/(.*)", "destination": "/" }
   ]
