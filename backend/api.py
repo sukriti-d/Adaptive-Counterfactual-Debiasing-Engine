@@ -301,12 +301,12 @@ def analyze(session_id: str):
                 if df[col].dtype == object and df[col].nunique() <= 10:
                     PROTECTED.append(col)
         
-        from mitigator import apply_reweighting, debias_dataset
-        from intersectional import intersectional_bias
-        from predictor import prepare_data, train_model
+        from backend.mitigator import apply_reweighting, debias_dataset
+        from backend.intersectional import intersectional_bias
+        from backend.predictor import prepare_data, train_model
         X1, y1, sc1, cols1 = prepare_data(df)
         model1 = train_model(X1, y1)
-        from predictor import predict
+        from backend.predictor import predict
         pred1 = predict(model1, sc1, df, cols1)
         bias1 = intersectional_bias(df, pred1, PROTECTED)
         df_w = apply_reweighting(df, bias1, group_cols=PROTECTED)
