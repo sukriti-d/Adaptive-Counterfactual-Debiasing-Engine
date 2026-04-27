@@ -6,9 +6,11 @@ __pycache__/
 .env
 .env.*
 .env.yaml
+.env.local
 
 # OS
 .DS_Store
 
 # Node (if frontend exists)
 node_modules/
+build/
