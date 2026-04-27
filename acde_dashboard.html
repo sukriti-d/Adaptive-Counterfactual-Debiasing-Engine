@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ACDE — Adaptive Counterfactual Debiasing Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#050816;--surface:#0d1526;--surface2:#111827;
+  --border:rgba(99,102,241,0.15);--border2:rgba(99,102,241,0.08);
+  --text:#e2e8f0;--muted:#64748b;--subtle:#475569;
+  --indigo:#6366f1;--purple:#a855f7;--green:#22c55e;
+  --red:#ef4444;--amber:#f59e0b;--orange:#f97316;
+  --mono:'IBM Plex Mono',monospace;--sans:'Inter',system-ui,sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;overflow-x:hidden}
+.grid-bg{position:fixed;inset:0;background-image:linear-gradient(rgba(99,102,241,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.05) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
+.glow{position:fixed;border-radius:50%;pointer-events:none;z-index:0}
+.glow-1{top:-200px;left:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(99,102,241,.12) 0,transparent 70%)}
+.glow-2{bottom:-200px;right:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(168,85,247,.08) 0,transparent 70%)}
+/* ─── HEADER ─────────────────────────────── */
+#header{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:64px;background:rgba(5,8,22,.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px)}
+.h-left{display:flex;align-items:center;gap:16px}
+.logo{font-size:22px;font-weight:900;background:linear-gradient(135deg,var(--indigo),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.05em}
+.badge-sm{font-size:10px;color:var(--subtle);background:rgba(99,102,241,.08);border:1px solid var(--border2);border-radius:4px;padding:3px 8px;letter-spacing:.08em}
+.h-right{display:flex;align-items:center;gap:12px}
+.score-chip{display:flex;flex-direction:column;align-items:center;padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.03);min-width:72px}
+.score-chip.after{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)}
+.chip-label{font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+.chip-val{font-size:20px;font-weight:800;line-height:1.2}
+.chip-arrow{color:var(--subtle);font-size:18px}
+/* ─── NAV ──────────────────────────────── */
+#nav{position:sticky;top:64px;z-index:99;display:flex;background:rgba(5,8,22,.85);border-bottom:1px solid var(--border2);overflow-x:auto;backdrop-filter:blur(8px)}
+.nav-btn{display:flex;align-items:center;gap:6px;padding:14px 18px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--subtle);font-size:12px;letter-spacing:.06em;cursor:pointer;font-family:var(--mono);white-space:nowrap;transition:all .15s}
+.nav-btn:hover{color:#94a3b8}
+.nav-btn.active{color:#a5b4fc;border-bottom-color:var(--indigo)}
+.nav-icon{font-size:13px;opacity:.7}
+/* ─── MAIN ─────────────────────────────── */
+#main{max-width:1280px;margin:0 auto;padding:32px;position:relative;z-index:1}
+/* ─── PANELS ──────────────────────────── */
+.panel{display:none}.panel.active{display:block}
+/* ─── SECTION HEADER ──────────────────── */
+.sec-hdr{margin-bottom:28px}
+.sec-hdr h2{font-size:22px;font-weight:800;letter-spacing:-.01em;color:var(--text)}
+.sec-hdr p{margin-top:6px;font-size:13px;color:var(--muted);font-family:var(--sans)}
+/* ─── CARD ─────────────────────────────── */
+.card{background:rgba(13,21,38,.7);border:1px solid var(--border2);border-radius:12px;padding:20px}
+.card-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px}
+.card-sub{font-size:12px;color:var(--muted);font-family:var(--sans);margin-bottom:16px}
+/* ─── GRIDS ─────────────────────────────── */
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.flex-col{display:flex;flex-direction:column;gap:20px}
+/* ─── METRIC CARDS (overview) ──────────── */
+.metric-card{background:rgba(13,21,38,.7);border:1px solid var(--border2);border-radius:12px;padding:20px 18px}
+.mc-label{font-size:10px;color:var(--indigo);letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px}
+.mc-values{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.mc-block{display:flex;flex-direction:column}
+.mc-sub{font-size:9px;color:var(--subtle);margin-bottom:2px}
+.mc-big{font-size:22px;font-weight:800;color:var(--text)}
+.mc-arr{color:#334155;font-size:15px;margin-top:10px}
+.mc-change{display:inline-block;font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid;margin-bottom:8px}
+.mc-desc{font-size:11px;color:var(--subtle);line-height:1.5;font-family:var(--sans)}
+/* ─── BAR CHART WRAPPER ──────────────── */
+.chart-wrap{position:relative;background:rgba(13,21,38,.7);border:1px solid var(--border2);border-radius:12px;padding:24px}
+/* ─── BARS (CSS native) ─────────────── */
+.bar-group{margin-bottom:12px}
+.bar-label{font-size:11px;color:#94a3b8;margin-bottom:5px;display:flex;justify-content:space-between}
+.bar-track{height:10px;background:rgba(255,255,255,.05);border-radius:5px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:5px;transition:width .6s ease}
+.bar-fill.indigo{background:var(--indigo)}
+.bar-fill.green{background:var(--green)}
+.bar-fill.red{background:var(--red)}
+.bar-fill.amber{background:var(--amber)}
+/* ─── TABLE ─────────────────────────── */
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;letter-spacing:.1em;color:var(--subtle);text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-transform:uppercase}
+td{font-size:12px;color:#94a3b8;padding:10px 12px;border-bottom:1px solid rgba(99,102,241,.05);vertical-align:middle}
+/* ─── PILLS ─────────────────────────── */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:10px;padding:3px 10px;border-radius:20px;border:1px solid}
+.pill.good{color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)}
+.pill.bad{color:var(--red);border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.08)}
+.pill.med{color:var(--amber);border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.08)}
+/* ─── INSTAB MATRIX ─────────────────── */
+.matrix{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.matrix-cell{display:flex;flex-direction:column;align-items:center;padding:14px;background:rgba(255,255,255,.02);border:1px solid;border-radius:10px;text-align:center}
+.matrix-icon{font-size:24px;margin-bottom:6px}
+.matrix-val{font-size:22px;font-weight:800;color:var(--text)}
+.matrix-lbl{font-size:10px;color:var(--muted);line-height:1.5;margin-top:4px;font-family:var(--sans)}
+.matrix-pct{font-size:10px;margin-top:4px}
+/* ─── CONCEPT BOX ───────────────────── */
+.concept-box{display:flex;gap:16px;background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.2);border-radius:12px;padding:20px}
+.concept-icon{font-size:28px;flex-shrink:0}
+.concept-title{font-size:13px;font-weight:700;color:#a5b4fc;margin-bottom:6px;letter-spacing:.04em}
+.concept-desc{font-size:13px;color:var(--muted);line-height:1.75;font-family:var(--sans)}
+/* ─── RADAR (SVG) ───────────────────── */
+.radar-svg{width:100%;max-width:420px;display:block;margin:0 auto}
+/* ─── HERO CARDS ─────────────────────── */
+.hero-card{background:rgba(13,21,38,.7);border:1px solid;border-radius:12px;padding:18px 16px}
+.hero-label{font-size:10px;color:var(--muted);letter-spacing:.08em;margin-bottom:8px;font-family:var(--sans)}
+.hero-val{font-size:30px;font-weight:900}
+/* ─── EXPLAINER ──────────────────────── */
+.finding-card{background:rgba(13,21,38,.7);border:1px solid;border-radius:12px;padding:24px}
+.finding-title{font-size:14px;font-weight:700;margin:0 0 10px;letter-spacing:.02em}
+.finding-body{font-size:13px;color:var(--muted);line-height:1.75;margin:0;font-family:var(--sans)}
+.analogy-box{background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:12px;padding:24px}
+.analogy-title{font-size:14px;font-weight:700;color:#a5b4fc;margin-bottom:12px}
+.analogy-text{font-size:14px;color:var(--muted);line-height:1.8;font-family:var(--sans)}
+.rec-row{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}
+.rec-priority{font-size:10px;padding:4px 10px;border-radius:20px;border:1px solid;letter-spacing:.1em;white-space:nowrap;margin-top:2px;flex-shrink:0}
+.rec-action{font-size:13px;color:var(--text);font-weight:700;margin-bottom:3px}
+.rec-detail{font-size:12px;color:var(--muted);line-height:1.6;font-family:var(--sans)}
+/* ─── SEVERITY BANNER ───────────────── */
+.sev-banner{display:flex;align-items:center;justify-content:space-between;border:1px solid;border-radius:12px;padding:18px 24px;flex-wrap:wrap;gap:12px}
+.sev-left{display:flex;align-items:center}
+.sev-title{font-size:15px;font-weight:800;letter-spacing:.08em;margin-bottom:4px}
+.sev-sub{font-size:12px;color:var(--muted);font-family:var(--sans)}
+.sev-metrics{display:flex;gap:20px;font-size:12px;color:var(--muted);font-family:monospace}
+/* ─── DIR METER ─────────────────────── */
+.dir-card{background:rgba(13,21,38,.7);border:1px solid var(--border2);border-radius:12px;padding:20px}
+.dir-label{font-size:11px;color:var(--indigo);letter-spacing:.1em;margin-bottom:8px}
+.dir-value{font-size:28px;font-weight:800;margin-bottom:12px}
+.dir-bar{position:relative;height:8px;background:rgba(255,255,255,.06);border-radius:4px;overflow:visible}
+.dir-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.dir-threshold{position:absolute;left:80%;top:-4px;height:16px;width:2px;background:var(--amber);border-radius:1px}
+/* ─── DATA PREVIEW ──────────────────── */
+.stat-card{background:rgba(13,21,38,.7);border:1px solid var(--border2);border-radius:10px;padding:16px}
+.stat-label{font-size:9px;color:var(--subtle);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.stat-value{font-size:18px;font-weight:800}
+.col-item{background:rgba(99,102,241,.06);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;display:inline-flex;flex-direction:column;gap:4px;margin:0 6px 6px 0}
+.col-name{font-size:12px;font-weight:600;color:var(--text)}
+.col-role{font-size:10px;color:var(--muted)}
+.rate-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.privacy-box{display:flex;gap:14px;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:16px;margin-top:16px}
+.privacy-title{font-size:12px;font-weight:700;color:var(--green);margin-bottom:4px}
+.privacy-text{font-size:12px;color:var(--muted);line-height:1.6;font-family:var(--sans)}
+/* ─── TOGGLE BUTTONS ────────────────── */
+.toggle-group{display:flex;flex-wrap:wrap;gap:6px}
+.toggle{font-size:11px;padding:5px 12px;border-radius:6px;border:1px solid rgba(99,102,241,.2);background:transparent;color:var(--subtle);cursor:pointer;font-family:var(--mono);transition:all .15s}
+.toggle.on{background:rgba(99,102,241,.2);border-color:rgba(99,102,241,.5);color:#a5b4fc}
+/* ─── CANVAS CHARTS ─────────────────── */
+canvas{display:block}
+/* ─── SCROLLBAR ─────────────────────── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#0f172a}
+::-webkit-scrollbar-thumb{background:#1e293b;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="glow glow-1"></div>
+<div class="glow glow-2"></div>
+
+<!-- HEADER -->
+<header id="header">
+  <div class="h-left">
+    <div class="logo">ACDE</div>
+    <div class="badge-sm">FAIRNESS AUDIT ENGINE · SYNTHETIC DATASET · 2,000 ROWS</div>
+  </div>
+  <div class="h-right">
+    <div class="score-chip">
+      <span class="chip-label">Before</span>
+      <span class="chip-val" id="score-before" style="color:#ef4444">25.9%</span>
+    </div>
+    <span class="chip-arrow">→</span>
+    <div class="score-chip after">
+      <span class="chip-label">After</span>
+      <span class="chip-val" id="score-after" style="color:#22c55e">68.1%</span>
+    </div>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav id="nav">
+  <button class="nav-btn active" onclick="showTab('overview')" id="tab-overview"><span class="nav-icon">◈</span>Overview</button>
+  <button class="nav-btn" onclick="showTab('disparity')" id="tab-disparity"><span class="nav-icon">◉</span>Group Disparity</button>
+  <button class="nav-btn" onclick="showTab('instability')" id="tab-instability"><span class="nav-icon">⬡</span>Counterfactual</button>
+  <button class="nav-btn" onclick="showTab('radar')" id="tab-radar"><span class="nav-icon">◎</span>Fairness Radar</button>
+  <button class="nav-btn" onclick="showTab('tradeoff')" id="tab-tradeoff"><span class="nav-icon">⊞</span>Tradeoff</button>
+  <button class="nav-btn" onclick="showTab('explainer')" id="tab-explainer"><span class="nav-icon">✦</span>Explanation</button>
+  <button class="nav-btn" onclick="showTab('data')" id="tab-data"><span class="nav-icon">≡</span>Dataset</button>
+</nav>
+
+<main id="main">
+
+<!-- ══════════════════════════════════════════════════════
+     OVERVIEW
+═══════════════════════════════════════════════════════ -->
+<div class="panel active" id="panel-overview">
+  <div class="sec-hdr">
+    <h2>Bias Overview</h2>
+    <p>High-level summary of bias detected before and after IPW mitigation — all 6 intersectional subgroups (gender × race)</p>
+  </div>
+
+  <!-- Metric cards -->
+  <div class="grid-3" style="margin-bottom:20px">
+    <div class="metric-card">
+      <div class="mc-label">Fairness Score</div>
+      <div class="mc-values">
+        <div class="mc-block"><div class="mc-sub">Before</div><div class="mc-big">25.9%</div></div>
+        <div class="mc-arr">→</div>
+        <div class="mc-block"><div class="mc-sub">After</div><div class="mc-big" style="color:var(--green)">68.1%</div></div>
+      </div>
+      <div class="mc-change" style="color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)">+42.2pts gain</div>
+      <div class="mc-desc">Composite: 1 − [0.4·DPD + 0.4·EOV + 0.2·IDI] — higher is fairer</div>
+    </div>
+    <div class="metric-card">
+      <div class="mc-label">Dem. Parity Diff</div>
+      <div class="mc-values">
+        <div class="mc-block"><div class="mc-sub">Before</div><div class="mc-big">0.9633</div></div>
+        <div class="mc-arr">→</div>
+        <div class="mc-block"><div class="mc-sub">After</div><div class="mc-big" style="color:var(--green)">0.5196</div></div>
+      </div>
+      <div class="mc-change" style="color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)">−46.1% reduction</div>
+      <div class="mc-desc">Max positive-rate gap across all demographic subgroups</div>
+    </div>
+    <div class="metric-card">
+      <div class="mc-label">Eq. Odds Violation</div>
+      <div class="mc-values">
+        <div class="mc-block"><div class="mc-sub">Before</div><div class="mc-big">0.9976</div></div>
+        <div class="mc-arr">→</div>
+        <div class="mc-block"><div class="mc-sub">After</div><div class="mc-big" style="color:var(--green)">0.3933</div></div>
+      </div>
+      <div class="mc-change" style="color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)">−60.6% reduction</div>
+      <div class="mc-desc">Max TPR/FPR gap across groups (equalized opportunity)</div>
+    </div>
+    <div class="metric-card">
+      <div class="mc-label">Counterfactual Flip Rate</div>
+      <div class="mc-values">
+        <div class="mc-block"><div class="mc-sub">Before</div><div class="mc-big">67.2%</div></div>
+        <div class="mc-arr">→</div>
+        <div class="mc-block"><div class="mc-sub">After</div><div class="mc-big" style="color:var(--green)">32.2%</div></div>
+      </div>
+      <div class="mc-change" style="color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)">−52.1% reduction</div>
+      <div class="mc-desc">% of predictions that flip when protected attribute is swapped</div>
+    </div>
+    <div class="metric-card">
+      <div class="mc-label">IDI Score</div>
+      <div class="mc-values">
+        <div class="mc-block"><div class="mc-sub">Before</div><div class="mc-big">0.5220</div></div>
+        <div class="mc-arr">→</div>
+        <div class="mc-block"><div class="mc-sub">After</div><div class="mc-big" style="color:var(--green)">0.1905</div></div>
+      </div>
+      <div class="mc-change" style="color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)">−63.5% reduction</div>
+      <div class="mc-desc">Individual Discrimination Index: mean |ΔP(ŷ=1)| on counterfactual flip</div>
+    </div>
+    <div class="metric-card">
+      <div class="mc-label">Accuracy</div>
+      <div class="mc-values">
+        <div class="mc-block"><div class="mc-sub">Before</div><div class="mc-big">88.1%</div></div>
+        <div class="mc-arr">→</div>
+        <div class="mc-block"><div class="mc-sub">After</div><div class="mc-big" style="color:var(--amber)">85.5%</div></div>
+      </div>
+      <div class="mc-change" style="color:var(--amber);border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.08)">−2.6pp cost</div>
+      <div class="mc-desc">Acceptable accuracy–fairness tradeoff (ROC AUC: 0.955→0.945)</div>
+    </div>
+  </div>
+
+  <!-- Positive rate chart -->
+  <div class="chart-wrap" style="margin-bottom:20px">
+    <div class="card-title">Positive Rate by Group — Before vs After Mitigation</div>
+    <div class="card-sub">Lower spread = more equitable outcomes. Groups sorted by most disadvantaged first.</div>
+    <canvas id="chart-posrate" height="200"></canvas>
+  </div>
+
+  <!-- DIR meters -->
+  <div class="grid-2">
+    <div class="dir-card">
+      <div class="dir-label">BEFORE — Disparate Impact Ratio</div>
+      <div class="dir-value" style="color:var(--red)">0.0182</div>
+      <div class="dir-bar"><div class="dir-fill" style="width:1.82%;background:var(--red)"></div><div class="dir-threshold" title="0.8 = 4/5ths threshold"></div></div>
+      <div style="color:var(--red);font-size:11px;margin-top:6px;letter-spacing:.05em">✗ Far below 0.80 threshold — severe disparate impact</div>
+    </div>
+    <div class="dir-card">
+      <div class="dir-label">AFTER — Disparate Impact Ratio</div>
+      <div class="dir-value" style="color:var(--amber)">0.1427</div>
+      <div class="dir-bar"><div class="dir-fill" style="width:14.27%;background:var(--amber)"></div><div class="dir-threshold"></div></div>
+      <div style="color:var(--amber);font-size:11px;margin-top:6px;letter-spacing:.05em">⚠ Improved but still below 0.80 — continued monitoring required</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     GROUP DISPARITY
+═══════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-disparity">
+  <div class="sec-hdr">
+    <h2>Group Disparity Analysis</h2>
+    <p>Intersectional fairness metrics broken down by all demographic subgroups (gender × race combinations)</p>
+  </div>
+
+  <div class="chart-wrap" style="margin-bottom:20px">
+    <div class="card-title">TPR / FPR / Precision by Group — Before & After</div>
+    <div class="card-sub">True Positive Rate, False Positive Rate, and Precision for each intersectional subgroup</div>
+    <div style="margin-bottom:12px" class="toggle-group">
+      <button class="toggle on" onclick="setDisparityMetric('tpr',this)">TPR</button>
+      <button class="toggle" onclick="setDisparityMetric('fpr',this)">FPR</button>
+      <button class="toggle" onclick="setDisparityMetric('precision',this)">Precision</button>
+      <button class="toggle" onclick="setDisparityMetric('positive_rate',this)">Pos. Rate</button>
+    </div>
+    <canvas id="chart-disparity" height="220"></canvas>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="card-title">Full Fairness Table</div>
+    <div style="overflow-x:auto">
+      <table id="disparity-table">
+        <thead><tr>
+          <th>Group</th><th>N</th>
+          <th style="color:var(--indigo)">Before Pos.Rate</th><th style="color:var(--green)">After Pos.Rate</th>
+          <th style="color:var(--indigo)">Before Disparity</th><th style="color:var(--green)">After Disparity</th>
+          <th style="color:var(--indigo)">Before TPR</th><th style="color:var(--green)">After TPR</th>
+          <th>Result</th>
+        </tr></thead>
+        <tbody id="disparity-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     COUNTERFACTUAL / INSTABILITY
+═══════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-instability">
+  <div class="sec-hdr">
+    <h2>Counterfactual Instability Analysis</h2>
+    <p>Measures how predictions change when protected attributes are flipped — a fair model shows near-zero instability</p>
+  </div>
+
+  <div class="concept-box" style="margin-bottom:20px">
+    <div class="concept-icon">⬡</div>
+    <div>
+      <div class="concept-title">What is counterfactual instability?</div>
+      <div class="concept-desc">For each individual, we create a <strong>"counterfactual twin"</strong> — identical in skills, experience and qualifications, but with a different protected attribute (e.g., Male→Female). If the model's prediction changes, it reveals <em>direct discriminatory sensitivity</em>. The <strong>Flip Rate</strong> measures how often this happens. The <strong>IDI Score</strong> measures the average probability shift magnitude. A perfectly fair model would show 0% instability.</div>
+    </div>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:20px">
+    <div class="card">
+      <div class="mc-label" style="color:var(--red)">Flip Rate (Before)</div>
+      <div style="font-size:32px;font-weight:800;color:var(--red)">67.2%</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">HIGH — strong discrimination signal</div>
+    </div>
+    <div class="card">
+      <div class="mc-label" style="color:var(--green)">Flip Rate (After)</div>
+      <div style="font-size:32px;font-weight:800;color:var(--green)">32.2%</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">MODERATE — 52.1% reduction</div>
+    </div>
+    <div class="card">
+      <div class="mc-label" style="color:var(--indigo)">IDI Before</div>
+      <div style="font-size:32px;font-weight:800;color:var(--indigo)">0.5220</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Avg. probability shift on flip</div>
+    </div>
+    <div class="card">
+      <div class="mc-label" style="color:var(--green)">IDI After</div>
+      <div style="font-size:32px;font-weight:800;color:var(--green)">0.1905</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">63.5% reduction achieved</div>
+    </div>
+  </div>
+
+  <div class="chart-wrap" style="margin-bottom:20px">
+    <div class="card-title">Instability Rate by Group — Flip Gender Scenario</div>
+    <div class="card-sub">How often each subgroup's prediction flips when gender is counterfactually changed. Asymmetry (neg→pos vs pos→neg) reveals who benefits/loses.</div>
+    <canvas id="chart-instab" height="220"></canvas>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-wrap">
+      <div class="card-title">Prediction Transition Matrix</div>
+      <div class="card-sub">What happens when gender is flipped for all 2,000 individuals?</div>
+      <div class="matrix">
+        <div class="matrix-cell" style="border-color:rgba(34,197,94,.3)">
+          <div class="matrix-icon" style="color:var(--green)">✓</div>
+          <div class="matrix-val">626</div>
+          <div class="matrix-lbl">Stable Negative<br>(0→0)</div>
+          <div class="matrix-pct" style="color:var(--green)">31.3%</div>
+        </div>
+        <div class="matrix-cell" style="border-color:rgba(99,102,241,.3)">
+          <div class="matrix-icon" style="color:var(--indigo)">↑</div>
+          <div class="matrix-val">635</div>
+          <div class="matrix-lbl">Gained Outcome<br>(0→1)</div>
+          <div class="matrix-pct" style="color:var(--indigo)">31.75%</div>
+        </div>
+        <div class="matrix-cell" style="border-color:rgba(239,68,68,.3)">
+          <div class="matrix-icon" style="color:var(--red)">↓</div>
+          <div class="matrix-val">709</div>
+          <div class="matrix-lbl">Lost Outcome<br>(1→0)</div>
+          <div class="matrix-pct" style="color:var(--red)">35.45%</div>
+        </div>
+        <div class="matrix-cell" style="border-color:rgba(34,197,94,.3)">
+          <div class="matrix-icon" style="color:var(--green)">✓</div>
+          <div class="matrix-val">30</div>
+          <div class="matrix-lbl">Stable Positive<br>(1→1)</div>
+          <div class="matrix-pct" style="color:var(--green)">1.5%</div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <div class="card-title">Before vs After Flip Rate Comparison</div>
+      <div class="card-sub">Baseline vs debiased model counterfactual sensitivity</div>
+      <canvas id="chart-flipcomp" height="180"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     RADAR
+═══════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-radar">
+  <div class="sec-hdr">
+    <h2>Fairness Radar</h2>
+    <p>Multi-dimensional fairness visualization — all axes normalized 0–100 (higher = fairer). Purple = before, green = after.</p>
+  </div>
+
+  <div class="grid-2" style="align-items:start">
+    <div class="chart-wrap">
+      <canvas id="chart-radar" height="380"></canvas>
+    </div>
+    <div class="flex-col">
+      <!-- 6 metric bars -->
+      <div id="radar-bars"></div>
+
+      <!-- Composite score -->
+      <div style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:16px">
+        <div style="font-size:9px;letter-spacing:.15em;color:var(--indigo);margin-bottom:12px;text-transform:uppercase">COMPOSITE FAIRNESS SCORE</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+          <div><div style="font-size:9px;color:var(--subtle);margin-bottom:3px">Before</div><div style="font-size:28px;font-weight:800;color:var(--indigo)">25.9%</div></div>
+          <div style="color:var(--subtle);font-size:18px">→</div>
+          <div><div style="font-size:9px;color:var(--subtle);margin-bottom:3px">After</div><div style="font-size:28px;font-weight:800;color:var(--green)">68.1%</div></div>
+          <div style="font-size:20px;font-weight:800;color:var(--amber);margin-left:6px">+42.2pts</div>
+        </div>
+        <div style="font-size:10px;color:var(--subtle)">F = 1 − [0.4·DPD + 0.4·EOV + 0.2·IDI] | 1.0 = perfectly fair</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     TRADEOFF
+═══════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-tradeoff">
+  <div class="sec-hdr">
+    <h2>Fairness–Utility Tradeoff Summary</h2>
+    <p>Complete before/after comparison — demonstrating that fairness improvements do not require sacrificing model utility</p>
+  </div>
+
+  <div class="grid-3" style="margin-bottom:20px">
+    <div class="hero-card" style="border-color:rgba(34,197,94,.3)"><div class="hero-label">Bias Reduction (Max Disparity)</div><div class="hero-val" style="color:var(--green)">+47.9%</div></div>
+    <div class="hero-card" style="border-color:rgba(34,197,94,.3)"><div class="hero-label">DPD Reduction</div><div class="hero-val" style="color:var(--green)">+46.1%</div></div>
+    <div class="hero-card" style="border-color:rgba(34,197,94,.3)"><div class="hero-label">EOV Reduction</div><div class="hero-val" style="color:var(--green)">+60.6%</div></div>
+    <div class="hero-card" style="border-color:rgba(34,197,94,.3)"><div class="hero-label">Flip Rate Reduction</div><div class="hero-val" style="color:var(--green)">+52.1%</div></div>
+    <div class="hero-card" style="border-color:rgba(34,197,94,.3)"><div class="hero-label">Fairness Score Gain</div><div class="hero-val" style="color:var(--green)">+42.2pts</div></div>
+    <div class="hero-card" style="border-color:rgba(239,68,68,.3)"><div class="hero-label">Accuracy Cost (Tradeoff)</div><div class="hero-val" style="color:var(--red)">−2.6pp</div></div>
+  </div>
+
+  <div class="chart-wrap" style="margin-bottom:20px;overflow-x:auto">
+    <div class="card-title">Complete Metrics Table — Before vs After Mitigation</div>
+    <table>
+      <thead><tr><th>Metric</th><th style="color:var(--indigo)">Before</th><th style="color:var(--green)">After</th><th>Change</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Accuracy</td><td style="color:var(--indigo)">88.10%</td><td style="color:var(--green)">85.50%</td><td style="color:var(--amber)">−2.60pp</td><td><span class="pill med">▼ Tradeoff</span></td></tr>
+        <tr><td>Balanced Accuracy</td><td style="color:var(--indigo)">86.99%</td><td style="color:var(--green)">82.66%</td><td style="color:var(--amber)">−4.33pp</td><td><span class="pill med">▼ Tradeoff</span></td></tr>
+        <tr><td>F1 Score</td><td style="color:var(--indigo)">84.42%</td><td style="color:var(--green)">79.02%</td><td style="color:var(--amber)">−5.40pp</td><td><span class="pill med">▼ Tradeoff</span></td></tr>
+        <tr><td>ROC AUC</td><td style="color:var(--indigo)">0.9550</td><td style="color:var(--green)">0.9448</td><td style="color:var(--amber)">−0.0102</td><td><span class="pill med">▼ Tradeoff</span></td></tr>
+        <tr><td colspan="5" style="border-bottom:1px solid var(--border);padding:4px 12px;color:var(--subtle);font-size:10px">─── FAIRNESS METRICS ───</td></tr>
+        <tr><td>Composite Fairness Score ↑</td><td style="color:var(--indigo)">25.90%</td><td style="color:var(--green)">68.07%</td><td style="color:var(--green)">+42.17pts</td><td><span class="pill good">▲ Improved</span></td></tr>
+        <tr><td>Dem. Parity Difference ↓</td><td style="color:var(--indigo)">0.9633</td><td style="color:var(--green)">0.5196</td><td style="color:var(--green)">−0.4437</td><td><span class="pill good">▲ Improved</span></td></tr>
+        <tr><td>Eq. Odds Violation ↓</td><td style="color:var(--indigo)">0.9976</td><td style="color:var(--green)">0.3933</td><td style="color:var(--green)">−0.6043</td><td><span class="pill good">▲ Improved</span></td></tr>
+        <tr><td>Pred. Parity Diff ↓</td><td style="color:var(--indigo)">0.1576</td><td style="color:var(--green)">0.2838</td><td style="color:var(--red)">+0.1262</td><td><span class="pill bad">▼ Worsened</span></td></tr>
+        <tr><td>Disparate Impact Ratio ↑</td><td style="color:var(--indigo)">0.0182</td><td style="color:var(--green)">0.1427</td><td style="color:var(--green)">+0.1245</td><td><span class="pill good">▲ Improved</span></td></tr>
+        <tr><td>Counterfactual Flip Rate ↓</td><td style="color:var(--indigo)">67.20%</td><td style="color:var(--green)">32.20%</td><td style="color:var(--green)">−35.00pp</td><td><span class="pill good">▲ Improved</span></td></tr>
+        <tr><td>IDI Score ↓</td><td style="color:var(--indigo)">0.5220</td><td style="color:var(--green)">0.1905</td><td style="color:var(--green)">−0.3315</td><td><span class="pill good">▲ Improved</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="card-title">Fairness–Accuracy Space</div>
+    <div class="card-sub">Mitigation moves the model toward the upper-right (high accuracy + high fairness). The green dot is the debiased model.</div>
+    <canvas id="chart-scatter" height="260"></canvas>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     EXPLAINER
+═══════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-explainer">
+  <div class="sec-hdr">
+    <h2>Bias Explanation Panel</h2>
+    <p>Plain-language interpretation of fairness audit results — designed for non-technical stakeholders and decision-makers</p>
+  </div>
+
+  <div class="sev-banner" style="border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.06);margin-bottom:20px">
+    <div class="sev-left">
+      <span style="font-size:28px;margin-right:12px">🚨</span>
+      <div>
+        <div class="sev-title" style="color:var(--red)">CRITICAL BIAS LEVEL DETECTED (PRE-MITIGATION)</div>
+        <div class="sev-sub">Composite Fairness Score: 25.9% / 100% — severely below acceptable threshold</div>
+      </div>
+    </div>
+    <div class="sev-metrics">
+      <span>DPD: <strong style="color:var(--red)">96.3pp</strong></span>
+      <span>Flip: <strong style="color:var(--red)">67.2%</strong></span>
+      <span>EOV: <strong style="color:var(--red)">99.8pp</strong></span>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:20px">
+    <div class="finding-card" style="border-color:rgba(239,68,68,.3)">
+      <div style="font-size:24px;margin-bottom:10px">⚠</div>
+      <div class="finding-title" style="color:var(--red)">Intersectional Bias Detected</div>
+      <div class="finding-body">The model shows a <strong>96.3 percentage-point</strong> gap in positive outcome rates between the most and least favored groups. Male/Race-A applicants receive positive outcomes <strong>96.3% of the time</strong>, while Female/Race-C applicants receive them <strong>0% of the time</strong> — despite potentially equal qualifications. This extreme disparity is consistent with severe algorithmic discrimination compounded by intersectionality.</div>
+    </div>
+    <div class="finding-card" style="border-color:rgba(99,102,241,.3)">
+      <div style="font-size:24px;margin-bottom:10px">⬡</div>
+      <div class="finding-title" style="color:#a5b4fc">Counterfactual Discrimination Found</div>
+      <div class="finding-body">When we create <strong>"counterfactual twins"</strong> — identical individuals except for their gender — <strong>67.2% of predictions change</strong>. This means <strong>1,344 out of 2,000</strong> individuals would receive a different outcome purely because of their gender, not their qualifications. The IDI Score of 0.522 confirms the model's confidence shifts dramatically based solely on protected attributes.</div>
+    </div>
+    <div class="finding-card" style="border-color:rgba(245,158,11,.3)">
+      <div style="font-size:24px;margin-bottom:10px">⚖</div>
+      <div class="finding-title" style="color:var(--amber)">Equalized Odds Violation</div>
+      <div class="finding-body">The model's True Positive Rate differs by <strong>99.8 percentage points</strong> across groups (Male/A TPR: 99.8% vs Female/C TPR: 0%). This means equally qualified individuals from different demographic groups have vastly different chances of being correctly identified. The disparate impact ratio (0.018) is far below the legal 4/5ths threshold (0.80) — indicating <strong>legally significant disparate impact</strong> under most fairness regulations.</div>
+    </div>
+    <div class="finding-card" style="border-color:rgba(34,197,94,.3)">
+      <div style="font-size:24px;margin-bottom:10px">✦</div>
+      <div class="finding-title" style="color:var(--green)">Mitigation Results</div>
+      <div class="finding-body">After IPW + iterative reweighting, the Composite Fairness Score improved from <strong>25.9% to 68.1%</strong> (+42.2pts). DPD dropped by 46.1%, EOV reduced by 60.6%, and the flip rate fell from 67.2% to 32.2%. The accuracy cost was minimal at <strong>2.6 percentage points</strong>, demonstrating that fairness and predictive performance are <em>not mutually exclusive</em> — bias reduction is achievable without gutting model utility.</div>
+    </div>
+  </div>
+
+  <div class="analogy-box" style="margin-bottom:20px">
+    <div class="analogy-title">🎓 What This Means in Real-World Terms</div>
+    <div class="analogy-text">
+      Imagine <strong>2,000 job applications</strong> being scored by this AI hiring system. Under the original model, <strong style="color:var(--red)">1,344 applicants</strong> would receive a different hiring decision if only their gender were changed — not their skills, experience, or education. That's <em>direct algorithmic discrimination</em> affecting two-thirds of all applicants. After mitigation, this drops to approximately <strong style="color:var(--green)">644 applicants</strong> — a 52% reduction in discriminatory decisions. However, complete fairness was not achieved (score: 68.1%), and this system <u>should not be deployed without additional oversight, human review, and continued monitoring</u>.
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="card-title" style="margin-bottom:16px">Actionable Recommendations</div>
+    <div class="rec-row">
+      <span class="rec-priority" style="color:var(--red);border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1)">Critical</span>
+      <div><div class="rec-action">Deploy only the debiased model</div><div class="rec-detail">The baseline model (fairness score 25.9%) shows unacceptable bias. Only the mitigated model (68.1%) should be used for real decisions affecting individuals.</div></div>
+    </div>
+    <div class="rec-row">
+      <span class="rec-priority" style="color:var(--orange);border-color:rgba(249,115,22,.4);background:rgba(249,115,22,.1)">High</span>
+      <div><div class="rec-action">Monitor ongoing fairness in production</div><div class="rec-detail">Even after mitigation, disparate impact ratio (0.1427) remains far below the 0.80 threshold. Continuous monitoring with periodic bias audits is required.</div></div>
+    </div>
+    <div class="rec-row">
+      <span class="rec-priority" style="color:var(--amber);border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.1)">High</span>
+      <div><div class="rec-action">Investigate data collection bias</div><div class="rec-detail">Historical bias in training data is a root cause. Audit data collection and labeling practices to prevent perpetuating systemic inequities in future model versions.</div></div>
+    </div>
+    <div class="rec-row">
+      <span class="rec-priority" style="color:var(--indigo);border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.1)">Medium</span>
+      <div><div class="rec-action">Explore in-processing debiasing techniques</div><div class="rec-detail">IPW is a post-hoc technique. Adversarial debiasing or fairness constraints during training (e.g., Zafar et al. 2017) may achieve better joint fairness–utility tradeoffs.</div></div>
+    </div>
+    <div class="rec-row">
+      <span class="rec-priority" style="color:var(--green);border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.1)">Low</span>
+      <div><div class="rec-action">Document and disclose bias audit findings</div><div class="rec-detail">Transparency is both ethically important and increasingly required by regulation (EU AI Act, US EEOC guidelines, NYC Local Law 144). Publish audit reports annually.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     DATA
+═══════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-data">
+  <div class="sec-hdr">
+    <h2>Dataset Preview</h2>
+    <p>2,000 rows · 7 columns · 39.5% positive rate · Protected attributes: gender, race</p>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:20px">
+    <div class="stat-card"><div class="stat-label">Total Rows</div><div class="stat-value">2,000</div></div>
+    <div class="stat-card"><div class="stat-label">Features</div><div class="stat-value">6</div></div>
+    <div class="stat-card"><div class="stat-label">Positive Rate</div><div class="stat-value">39.5%</div></div>
+    <div class="stat-card"><div class="stat-label">Protected Attrs</div><div class="stat-value" style="font-size:14px">gender + race</div></div>
+  </div>
+
+  <div class="chart-wrap" style="margin-bottom:16px">
+    <div class="card-title" style="margin-bottom:12px">Column Schema</div>
+    <div>
+      <span class="col-item"><div class="col-name">age</div><div class="col-role">📊 Feature</div></span>
+      <span class="col-item" style="border-color:rgba(168,85,247,.3)"><div class="col-name" style="color:#c084fc">gender</div><div class="col-role">🔒 Protected</div></span>
+      <span class="col-item" style="border-color:rgba(168,85,247,.3)"><div class="col-name" style="color:#c084fc">race</div><div class="col-role">🔒 Protected</div></span>
+      <span class="col-item"><div class="col-name">skill_score</div><div class="col-role">📊 Feature</div></span>
+      <span class="col-item"><div class="col-name">experience_yrs</div><div class="col-role">📊 Feature</div></span>
+      <span class="col-item"><div class="col-name">education_level</div><div class="col-role">📊 Feature</div></span>
+      <span class="col-item" style="border-color:rgba(34,197,94,.3)"><div class="col-name" style="color:var(--green)">target</div><div class="col-role">🎯 Target</div></span>
+    </div>
+  </div>
+
+  <div class="chart-wrap" style="margin-bottom:16px">
+    <div class="card-title" style="margin-bottom:12px">Positive Rate by Gender (Raw Data)</div>
+    <div class="rate-row"><span style="font-size:12px;color:#e2e8f0;width:60px;flex-shrink:0">Female</span><div style="flex:1;height:10px;background:rgba(255,255,255,.05);border-radius:5px;overflow:hidden"><div style="width:11.81%;height:100%;background:var(--red);border-radius:5px"></div></div><span style="font-size:12px;color:#94a3b8;width:44px;text-align:right">11.8%</span></div>
+    <div class="rate-row"><span style="font-size:12px;color:#e2e8f0;width:60px;flex-shrink:0">Male</span><div style="flex:1;height:10px;background:rgba(255,255,255,.05);border-radius:5px;overflow:hidden"><div style="width:64.81%;height:100%;background:var(--indigo);border-radius:5px"></div></div><span style="font-size:12px;color:#94a3b8;width:44px;text-align:right">64.8%</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;font-family:var(--sans)">⚠ 53pp raw gap in the training data — the root cause of learned discrimination</div>
+  </div>
+
+  <div class="chart-wrap" style="margin-bottom:16px;overflow-x:auto">
+    <div class="card-title" style="margin-bottom:12px">Data Preview (First 10 Rows)</div>
+    <table>
+      <thead><tr><th>age</th><th style="color:#c084fc">gender</th><th style="color:#c084fc">race</th><th>skill_score</th><th>experience_yrs</th><th>education_level</th><th style="color:var(--green)">target</th></tr></thead>
+      <tbody>
+        <tr><td>47</td><td style="color:#c084fc">Female</td><td style="color:#c084fc">C</td><td>0.3352</td><td>1</td><td>2</td><td style="color:var(--red)">0</td></tr>
+        <tr><td>50</td><td style="color:#c084fc">Male</td><td style="color:#c084fc">A</td><td>0.4188</td><td>7</td><td>2</td><td style="color:var(--red)">0</td></tr>
+        <tr><td>32</td><td style="color:#c084fc">Female</td><td style="color:#c084fc">C</td><td>0.5408</td><td>6</td><td>1</td><td style="color:var(--red)">0</td></tr>
+        <tr><td>36</td><td style="color:#c084fc">Female</td><td style="color:#c084fc">B</td><td>0.4058</td><td>17</td><td>2</td><td style="color:var(--red)">0</td></tr>
+        <tr><td>59</td><td style="color:#c084fc">Male</td><td style="color:#c084fc">A</td><td>0.4582</td><td>17</td><td>3</td><td style="color:var(--green)">1</td></tr>
+        <tr><td>56</td><td style="color:#c084fc">Female</td><td style="color:#c084fc">C</td><td>0.5662</td><td>2</td><td>2</td><td style="color:var(--red)">0</td></tr>
+        <tr><td>38</td><td style="color:#c084fc">Female</td><td style="color:#c084fc">B</td><td>0.4477</td><td>18</td><td>1</td><td style="color:var(--red)">0</td></tr>
+        <tr><td>31</td><td style="color:#c084fc">Female</td><td style="color:#c084fc">A</td><td>0.5339</td><td>11</td><td>2</td><td style="color:var(--red)">0</td></tr>
+        <tr><td>34</td><td style="color:#c084fc">Male</td><td style="color:#c084fc">A</td><td>0.7389</td><td>6</td><td>2</td><td style="color:var(--red)">0</td></tr>
+        <tr><td>43</td><td style="color:#c084fc">Male</td><td style="color:#c084fc">B</td><td>0.4742</td><td>8</td><td>3</td><td style="color:var(--green)">1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="privacy-box">
+    <span style="font-size:22px;flex-shrink:0">🔒</span>
+    <div>
+      <div class="privacy-title">Data Privacy Guarantee</div>
+      <div class="privacy-text">In the full-stack deployment: uploaded data is processed in-memory only and never persisted to disk. Sessions are scoped by UUID and automatically expire. No raw data is exposed through any API endpoint. ACDE operates on aggregate fairness statistics only after initial in-process analysis. No third-party analytics or data sharing.</div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// DATA (from real ACDE pipeline run)
+// ═══════════════════════════════════════════════════════════
+const DATA = {"protected_attributes":["gender","race"],"n_rows":2000,"positive_rate":0.3945,"columns":["age","gender","race","skill_score","experience_yrs","education_level","target"],"group_rates":{"Female":0.1181,"Male":0.6481},"before":{"performance":{"accuracy":0.881,"f1":0.8442,"roc_auc":0.955,"balanced":0.8699},"bias_table":[{"group":"Male / A","n":490,"positive_rate":0.9633,"disparity":0.5938,"tpr":0.9976,"fpr":0.7703,"precision":0.8792},{"group":"Female / C","n":185,"positive_rate":0.0,"disparity":0.3695,"tpr":0.0,"fpr":0.0,"precision":null},{"group":"Female / B","n":343,"positive_rate":0.0175,"disparity":0.352,"tpr":0.2069,"fpr":0.0,"precision":1.0},{"group":"Female / A","n":429,"positive_rate":0.0326,"disparity":0.3369,"tpr":0.2029,"fpr":0.0,"precision":1.0},{"group":"Male / B","n":347,"positive_rate":0.5303,"disparity":0.1608,"tpr":0.8611,"fpr":0.1737,"precision":0.8424},{"group":"Male / C","n":206,"positive_rate":0.3058,"disparity":0.0637,"tpr":0.6875,"fpr":0.0635,"precision":0.873}],"metrics":{"demographic_parity_difference":0.9633,"equalized_odds_violation":0.9976,"predictive_parity_difference":0.1576,"disparate_impact_ratio":0.0182},"fairness_score":0.259,"instability":{"flip_rate":0.672,"idi":0.522,"flip_breakdown":{"stable_neg":626,"neg_to_pos":635,"pos_to_neg":709,"stable_pos":30},"group_instability":[{"group":"Male / A","n":490,"instability_rate":0.9469,"neg_to_pos":0,"pos_to_neg":464},{"group":"Female / A","n":429,"instability_rate":0.9417,"neg_to_pos":404,"pos_to_neg":0},{"group":"Male / B","n":347,"instability_rate":0.5245,"neg_to_pos":0,"pos_to_neg":182},{"group":"Female / B","n":343,"instability_rate":0.4723,"neg_to_pos":162,"pos_to_neg":0},{"group":"Female / C","n":185,"instability_rate":0.373,"neg_to_pos":69,"pos_to_neg":0},{"group":"Male / C","n":206,"instability_rate":0.3058,"neg_to_pos":0,"pos_to_neg":63}]},"all_instability_scenarios":{"flip_gender":{"flip_rate":0.672,"idi":0.522,"flip_breakdown":{"stable_neg":626,"neg_to_pos":635,"pos_to_neg":709,"stable_pos":30},"group_instability":[{"group":"Male / A","n":490,"instability_rate":0.9469,"neg_to_pos":0,"pos_to_neg":464},{"group":"Female / A","n":429,"instability_rate":0.9417,"neg_to_pos":404,"pos_to_neg":0},{"group":"Male / B","n":347,"instability_rate":0.5245,"neg_to_pos":0,"pos_to_neg":182},{"group":"Female / B","n":343,"instability_rate":0.4723,"neg_to_pos":162,"pos_to_neg":0},{"group":"Female / C","n":185,"instability_rate":0.373,"neg_to_pos":69,"pos_to_neg":0},{"group":"Male / C","n":206,"instability_rate":0.3058,"neg_to_pos":0,"pos_to_neg":63}]}}},"after":{"performance":{"accuracy":0.855,"f1":0.7902,"roc_auc":0.9448,"balanced":0.8266},"bias_table":[{"group":"Male / A","n":490,"positive_rate":0.6061,"disparity":0.3096,"tpr":0.7139,"fpr":0.0,"precision":1.0},{"group":"Female / C","n":185,"positive_rate":0.0865,"disparity":0.21,"tpr":0.9333,"fpr":0.0118,"precision":0.875},{"group":"Female / B","n":343,"positive_rate":0.0904,"disparity":0.2061,"tpr":0.9655,"fpr":0.0096,"precision":0.9032},{"group":"Female / A","n":429,"positive_rate":0.1725,"disparity":0.124,"tpr":0.7681,"fpr":0.0583,"precision":0.7162},{"group":"Male / B","n":347,"positive_rate":0.3199,"disparity":0.0234,"tpr":0.5722,"fpr":0.0479,"precision":0.9279},{"group":"Male / C","n":206,"positive_rate":0.3107,"disparity":0.0142,"tpr":0.6375,"fpr":0.1032,"precision":0.7969}],"metrics":{"demographic_parity_difference":0.5196,"equalized_odds_violation":0.3933,"predictive_parity_difference":0.2838,"disparate_impact_ratio":0.1427},"fairness_score":0.6807,"instability":{"flip_rate":0.322,"idi":0.1905,"group_instability":[{"group":"Male / A","n":490,"instability_rate":0.4204,"neg_to_pos":3,"pos_to_neg":203},{"group":"Female / A","n":429,"instability_rate":0.3706,"neg_to_pos":158,"pos_to_neg":1},{"group":"Female / C","n":185,"instability_rate":0.2919,"neg_to_pos":53,"pos_to_neg":1},{"group":"Male / B","n":347,"instability_rate":0.2911,"neg_to_pos":6,"pos_to_neg":95},{"group":"Male / C","n":206,"instability_rate":0.2816,"neg_to_pos":1,"pos_to_neg":57},{"group":"Female / B","n":343,"instability_rate":0.1924,"neg_to_pos":65,"pos_to_neg":1}]}},"comparison":{"bias_reduction":47.9,"dpd_reduction":46.1,"eov_reduction":60.6,"fairness_gain":0.4217,"accuracy_cost":0.026,"flip_rate_reduction":52.1}};
+
+// Chart.js defaults
+Chart.defaults.color = '#64748b';
+Chart.defaults.borderColor = 'rgba(99,102,241,0.08)';
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+
+let disparityChart = null;
+let currentDisparityMetric = 'tpr';
+
+// ═══════════════════════════════════════════════════════════
+// TAB NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  // Init charts lazily
+  if (name === 'overview' && !window._chartPosrate) initOverviewCharts();
+  if (name === 'disparity' && !window._chartDisparity) initDisparityCharts();
+  if (name === 'instability' && !window._chartInstab) initInstabCharts();
+  if (name === 'radar' && !window._chartRadar) initRadarChart();
+  if (name === 'tradeoff' && !window._chartScatter) initScatterChart();
+}
+
+// ═══════════════════════════════════════════════════════════
+// OVERVIEW CHARTS
+// ═══════════════════════════════════════════════════════════
+function initOverviewCharts() {
+  window._chartPosrate = true;
+  const groups = DATA.before.bias_table.map(r => r.group.replace(' / ','/'));
+  const bBefore = DATA.before.bias_table.map(r => +(r.positive_rate*100).toFixed(1));
+  const bAfter  = DATA.after.bias_table.map(r => +(r.positive_rate*100).toFixed(1));
+
+  new Chart(document.getElementById('chart-posrate'), {
+    type: 'bar',
+    data: {
+      labels: groups,
+      datasets: [
+        { label: 'Before Mitigation', data: bBefore, backgroundColor: 'rgba(99,102,241,0.7)', borderRadius: 4 },
+        { label: 'After Mitigation',  data: bAfter,  backgroundColor: 'rgba(34,197,94,0.75)', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#94a3b8' } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + c.raw + '%' } }
+      },
+      scales: {
+        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(99,102,241,0.06)' } },
+        y: { ticks: { color: '#64748b', callback: v => v + '%' }, grid: { color: 'rgba(99,102,241,0.06)' }, max: 100 }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// DISPARITY CHARTS
+// ═══════════════════════════════════════════════════════════
+function initDisparityCharts() {
+  window._chartDisparity = true;
+  buildDisparityTable();
+  buildDisparityChart('tpr');
+}
+
+function buildDisparityTable() {
+  const tbody = document.getElementById('disparity-tbody');
+  tbody.innerHTML = '';
+  DATA.before.bias_table.forEach((b,i) => {
+    const a = DATA.after.bias_table[i];
+    const improved = a.disparity < b.disparity;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:700;color:#e2e8f0">${b.group}</td>
+      <td>${b.n}</td>
+      <td style="color:var(--indigo)">${(b.positive_rate*100).toFixed(1)}%</td>
+      <td style="color:var(--green)">${(a.positive_rate*100).toFixed(1)}%</td>
+      <td style="color:var(--indigo)">${(b.disparity*100).toFixed(1)}pp</td>
+      <td style="color:var(--green)">${(a.disparity*100).toFixed(1)}pp</td>
+      <td style="color:var(--indigo)">${b.tpr!=null?(b.tpr*100).toFixed(1)+'%':'N/A'}</td>
+      <td style="color:var(--green)">${a.tpr!=null?(a.tpr*100).toFixed(1)+'%':'N/A'}</td>
+      <td><span class="pill ${improved?'good':'bad'}">${improved?'▲ Better':'▼ Higher'}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function buildDisparityChart(metric) {
+  currentDisparityMetric = metric;
+  const groups = DATA.before.bias_table.map(r => r.group.replace(' / ','/'));
+  const bef = DATA.before.bias_table.map(r => r[metric]!=null ? +(r[metric]*100).toFixed(1) : 0);
+  const aft = DATA.after.bias_table.map(r => r[metric]!=null ? +(r[metric]*100).toFixed(1) : 0);
+
+  if (disparityChart) { disparityChart.destroy(); }
+  disparityChart = new Chart(document.getElementById('chart-disparity'), {
+    type: 'bar',
+    data: {
+      labels: groups,
+      datasets: [
+        { label: 'Before', data: bef, backgroundColor: 'rgba(99,102,241,0.7)', borderRadius: 4 },
+        { label: 'After',  data: aft, backgroundColor: 'rgba(34,197,94,0.75)', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#94a3b8' } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + c.raw + '%' } }
+      },
+      scales: {
+        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(99,102,241,0.06)' } },
+        y: { ticks: { color: '#64748b', callback: v => v + '%' }, grid: { color: 'rgba(99,102,241,0.06)' } }
+      }
+    }
+  });
+}
+
+function setDisparityMetric(metric, btn) {
+  document.querySelectorAll('.toggle').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  buildDisparityChart(metric);
+}
+
+// ═══════════════════════════════════════════════════════════
+// INSTABILITY CHARTS
+// ═══════════════════════════════════════════════════════════
+function initInstabCharts() {
+  window._chartInstab = true;
+  const gi = DATA.before.instability.group_instability;
+  const groups = gi.map(r => r.group.replace(' / ','/'));
+  const rates  = gi.map(r => +(r.instability_rate*100).toFixed(1));
+  const colors = rates.map(v => v > 60 ? 'rgba(239,68,68,0.8)' : v > 30 ? 'rgba(245,158,11,0.8)' : 'rgba(99,102,241,0.8)');
+
+  new Chart(document.getElementById('chart-instab'), {
+    type: 'bar',
+    data: {
+      labels: groups,
+      datasets: [{
+        label: 'Instability Rate',
+        data: rates,
+        backgroundColor: colors,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: c => {
+          const d = gi[c.dataIndex];
+          return [`Rate: ${c.raw}%`, `Neg→Pos: ${d.neg_to_pos}`, `Pos→Neg: ${d.pos_to_neg}`];
+        }}}
+      },
+      scales: {
+        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(99,102,241,0.06)' } },
+        y: { ticks: { color: '#64748b', callback: v => v + '%' }, grid: { color: 'rgba(99,102,241,0.06)' }, max: 100 }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chart-flipcomp'), {
+    type: 'bar',
+    data: {
+      labels: ['Before Mitigation', 'After Mitigation'],
+      datasets: [
+        { label: 'Flip Rate', data: [67.2, 32.2], backgroundColor: ['rgba(239,68,68,0.8)','rgba(34,197,94,0.8)'], borderRadius: 4 },
+        { label: 'IDI Score ×100', data: [52.2, 19.1], backgroundColor: ['rgba(99,102,241,0.6)','rgba(34,197,94,0.5)'], borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(99,102,241,0.06)' } },
+        y: { ticks: { color: '#64748b', callback: v => v + '%' }, grid: { color: 'rgba(99,102,241,0.06)' } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// RADAR CHART
+// ═══════════════════════════════════════════════════════════
+function initRadarChart() {
+  window._chartRadar = true;
+
+  const radarMetrics = [
+    { label: 'Dem. Parity', before: 1-DATA.before.metrics.demographic_parity_difference, after: 1-DATA.after.metrics.demographic_parity_difference, fullName: 'Demographic Parity', desc: '1 − DPD. Higher = more equitable positive rates.' },
+    { label: 'Eq. Odds',    before: 1-DATA.before.metrics.equalized_odds_violation,       after: 1-DATA.after.metrics.equalized_odds_violation,       fullName: 'Equalized Odds', desc: '1 − EOV. Higher = more balanced TPR/FPR.' },
+    { label: 'Pred. Parity',before: 1-DATA.before.metrics.predictive_parity_difference,   after: 1-DATA.after.metrics.predictive_parity_difference,   fullName: 'Predictive Parity', desc: '1 − PPD. Higher = consistent precision.' },
+    { label: 'CF Stability',before: 1-DATA.before.instability.flip_rate,                  after: 1-DATA.after.instability.flip_rate,                  fullName: 'Counterfactual Stability', desc: '1 − Flip Rate. Higher = stable predictions.' },
+    { label: 'IDI Stability',before: 1-DATA.before.instability.idi,                       after: 1-DATA.after.instability.idi,                        fullName: 'IDI Stability', desc: '1 − IDI. Higher = smaller prob. shifts.' },
+    { label: 'Disp. Impact',before: Math.min(DATA.before.metrics.disparate_impact_ratio,1), after: Math.min(DATA.after.metrics.disparate_impact_ratio,1), fullName: 'Disparate Impact Ratio', desc: 'Min/Max rate. 80%+ = 4/5ths rule.' },
+  ];
+
+  new Chart(document.getElementById('chart-radar'), {
+    type: 'radar',
+    data: {
+      labels: radarMetrics.map(m => m.label),
+      datasets: [
+        { label: 'Before Mitigation', data: radarMetrics.map(m => +(m.before*100).toFixed(1)), borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)', pointBackgroundColor: '#6366f1', borderWidth: 2 },
+        { label: 'After Mitigation',  data: radarMetrics.map(m => +(m.after*100).toFixed(1)),  borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.12)',  pointBackgroundColor: '#22c55e', borderWidth: 2 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 12 } } } },
+      scales: {
+        r: {
+          min: 0, max: 100,
+          ticks: { color: '#475569', backdropColor: 'transparent', stepSize: 20, callback: v => v + '%' },
+          grid: { color: 'rgba(99,102,241,0.12)' },
+          pointLabels: { color: '#94a3b8', font: { size: 11, family: 'IBM Plex Mono' } },
+          angleLines: { color: 'rgba(99,102,241,0.1)' }
+        }
+      }
+    }
+  });
+
+  // Build metric bars
+  const barsEl = document.getElementById('radar-bars');
+  barsEl.innerHTML = '';
+  radarMetrics.forEach(m => {
+    const bPct = (m.before*100).toFixed(1);
+    const aPct = (m.after*100).toFixed(1);
+    const improved = m.after > m.before;
+    const delta = (m.after - m.before)*100;
+    barsEl.innerHTML += `
+      <div style="background:rgba(13,21,38,.7);border:1px solid rgba(99,102,241,.1);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;align-items:center">
+          <span style="font-size:11px;color:#e2e8f0;font-weight:600">${m.fullName}</span>
+          <span style="color:${improved?'#22c55e':'#ef4444'};font-size:11px">${improved?'▲':'▼'} ${Math.abs(delta).toFixed(1)}pts</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <div style="flex:1;height:6px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden"><div style="width:${bPct}%;height:100%;background:#6366f1;opacity:.7;border-radius:3px"></div></div>
+          <span style="font-size:10px;color:#6366f1;width:36px;text-align:right">${bPct}%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="flex:1;height:6px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden"><div style="width:${aPct}%;height:100%;background:#22c55e;opacity:.8;border-radius:3px"></div></div>
+          <span style="font-size:10px;color:#22c55e;width:36px;text-align:right">${aPct}%</span>
+        </div>
+        <div style="font-size:10px;color:#475569;font-family:sans-serif">${m.desc}</div>
+      </div>
+    `;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCATTER / TRADEOFF CHART
+// ═══════════════════════════════════════════════════════════
+function initScatterChart() {
+  window._chartScatter = true;
+  new Chart(document.getElementById('chart-scatter'), {
+    type: 'scatter',
+    data: {
+      datasets: [
+        { label: 'Before Mitigation', data: [{ x: DATA.before.performance.accuracy*100, y: DATA.before.fairness_score*100 }], backgroundColor: '#6366f1', pointRadius: 14, pointHoverRadius: 16 },
+        { label: 'After Mitigation',  data: [{ x: DATA.after.performance.accuracy*100,  y: DATA.after.fairness_score*100  }], backgroundColor: '#22c55e', pointRadius: 14, pointHoverRadius: 16 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { size: 12 } } },
+        tooltip: { callbacks: { label: c => [`${c.dataset.label}`, `Accuracy: ${c.raw.x.toFixed(1)}%`, `Fairness: ${c.raw.y.toFixed(1)}%`] } }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Accuracy →', color: '#64748b' }, ticks: { color: '#64748b', callback: v => v + '%' }, grid: { color: 'rgba(99,102,241,0.06)' }, min: 82, max: 92 },
+        y: { title: { display: true, text: 'Fairness Score →', color: '#64748b' }, ticks: { color: '#64748b', callback: v => v + '%' }, grid: { color: 'rgba(99,102,241,0.06)' }, min: 0, max: 100 }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  initOverviewCharts();
+});
+</script>
+</body>
+</html>
