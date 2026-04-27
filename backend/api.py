@@ -22,7 +22,7 @@ import pandas as pd
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from gemini_advisor import generate_bias_advisory
+from backend.gemini_advisor import generate_bias_advisory
 from sklearn.metrics import (
     accuracy_score, f1_score, roc_auc_score, balanced_accuracy_score
 )
