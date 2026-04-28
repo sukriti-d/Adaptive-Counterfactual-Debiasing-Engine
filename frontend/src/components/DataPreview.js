@@ -219,7 +219,6 @@ export default function DataPreview({ data, sessionId }) {
   const rows = showAll ? data.preview : data.preview?.slice(0, 5);
   const cols = data.columns || [];
 
-  const API = import.meta.env.VITE_API_URL;
 
   const handleExportCSV = async () => {
     setCsvExporting(true);
@@ -228,7 +227,7 @@ export default function DataPreview({ data, sessionId }) {
         alert("Session ID not found. Please upload data again.");
         return;
       }
-      const response = await fetch(`${API}/export/${sessionId}`)
+      const response = await fetch(`https://adaptive-counterfactual-debiasing-engine.onrender.com/export/${sessionId}`)
       if (!response.ok) throw new Error(await response.text());
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
