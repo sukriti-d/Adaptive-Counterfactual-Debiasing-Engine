@@ -6,8 +6,7 @@ function GeminiAdvisory({ sessionId }) {
   const [status, setStatus] = useState("idle"); // idle | loading | done | error
   const [advisory, setAdvisory] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const API = import.meta.env.VITE_API_URL;
-
+  const API = process.env.REACT_APP_API_URL;
   const fetchAdvisory = async () => {
     setStatus("loading");
     setErrorMsg("");
