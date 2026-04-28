@@ -219,6 +219,8 @@ export default function DataPreview({ data, sessionId }) {
   const rows = showAll ? data.preview : data.preview?.slice(0, 5);
   const cols = data.columns || [];
 
+  const API = import.meta.env.VITE_API_URL;
+
   const handleExportCSV = async () => {
     setCsvExporting(true);
     try {
@@ -226,7 +228,7 @@ export default function DataPreview({ data, sessionId }) {
         alert("Session ID not found. Please upload data again.");
         return;
       }
-      const response = await fetch(`http://localhost:8000/export/${sessionId}`);
+      const response = await fetch(`${API}/export/${sessionId}`)
       if (!response.ok) throw new Error(await response.text());
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
