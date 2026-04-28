@@ -8,6 +8,8 @@ import google.generativeai as genai
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
+client = genai.GenerativeModel("gemini-1.5-flash")
+
 def generate_bias_advisory(result: dict) -> dict:
     before = result.get("before", {})
     after  = result.get("after", {})
