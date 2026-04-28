@@ -26,7 +26,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [API]);
 
   const runUpload = useCallback(async (file) => {
     setLoading(true);
