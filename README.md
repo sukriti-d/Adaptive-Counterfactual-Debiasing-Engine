@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Adaptive-Counterfactual-Debiasing-Engine
 Fairness Audit &amp; Mitigation Platform
 =======
@@ -78,6 +78,12 @@ final app/
             ├── BiasExplainer.js      # Plain-language explanations
             └── DataPreview.js        # Dataset table and export buttons
 ```
+<img width="1919" height="894" alt="Screenshot 2026-04-27 215823" src="https://github.com/user-attachments/assets/7f25a497-b990-4dc2-9a8e-6c00031ed05f" />
+<img width="1919" height="888" alt="Screenshot 2026-04-27 215615" src="https://github.com/user-attachments/assets/5b7b3e38-1321-47a9-a70e-58b3c2986d6a" />
+<img width="1919" height="834" alt="Screenshot 2026-04-27 215520" src="https://github.com/user-attachments/assets/082bbe40-9433-43ac-b209-f4617272beea" />
+<img width="1919" height="865" alt="Screenshot 2026-04-27 215501" src="https://github.com/user-attachments/assets/714ae190-d364-4958-9647-4690ee747de5" />
+<img width="1919" height="813" alt="Screenshot 2026-04-27 215442" src="https://github.com/user-attachments/assets/ed0b7937-5f0d-47ef-ada3-ed5d90c779cc" />
+<img width="1919" height="916" alt="Screenshot 2026-04-27 215420" src="https://github.com/user-attachments/assets/e29fb5ef-d6d1-4120-b8ea-0cecdd348042" />
 
 ---
 
