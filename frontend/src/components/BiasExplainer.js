@@ -6,12 +6,13 @@ function GeminiAdvisory({ sessionId }) {
   const [status, setStatus] = useState("idle"); // idle | loading | done | error
   const [advisory, setAdvisory] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const API = import.meta.env.VITE_API_URL;
 
   const fetchAdvisory = async () => {
     setStatus("loading");
     setErrorMsg("");
     try {
-      const res = await fetch(`/gemini-advisory/${sessionId}`);
+      const res = await fetch(`${API}/gemini-advisory/${sessionId}`)
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail || "Request failed");
