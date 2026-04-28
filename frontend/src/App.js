@@ -2,7 +2,7 @@ import React, { useState, useCallback } from "react";
 import Dashboard from "./components/Dashboard";
 import UploadScreen from "./components/UploadScreen";
 
-const API = process.env.REACT_APP_API_URL || "";
+const API = "https://your-backend-name.onrender.com";
 
 export default function App() {
   const [result, setResult] = useState(null);
