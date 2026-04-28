@@ -46,10 +46,7 @@ Respond ONLY with a valid JSON object — no markdown, no backticks, no preamble
 }}
 """
 
-    response = client.generate_content(
-        model="gemini-flash-latest",
-        contents=prompt,
-    )
+    response = client.generate_content(prompt)
 
     text = response.text.strip()
     # Strip markdown code fences if model adds them anyway
